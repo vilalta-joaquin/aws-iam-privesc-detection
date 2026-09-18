@@ -1,0 +1,39 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+.terraform.lock.hcl
+
+# CloudGoat
+cloudgoat/config.yml
+cloudgoat/whitelist.txt
+**/cloudgoat_outputs/
+
+# AWS / credentials — never commit these, ever
+.aws/
+*.pem
+*.key
+**/credentials
+**/access_key*
+
+# Audit tool raw output (may contain account IDs, ARNs, resource details —
+# review before deciding what's safe to publish in findings/)
+**/prowler-output/
+**/scoutsuite-report/
+*.ndjson
+scoutsuite-results/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+.vscode/
