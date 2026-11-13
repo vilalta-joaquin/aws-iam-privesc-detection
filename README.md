@@ -1,49 +1,82 @@
 # AWS Cloud Security Assessment & Detection Pipeline
 
-Status: **Phase 1 (AWS account lockdown) complete — moving into tooling setup**
-Target completion: early-to-mid October 2026
+A hands-on cloud security assessment of an intentionally vulnerable AWS
+environment: manual exploitation, automated scanning, severity analysis, and a
+custom CloudTrail-based detection tool for the attack the scanners missed.
 
-See `NOTES.md` for the running session log — always check it first in a new
-conversation before assuming nothing's been done.
+> **Note:** This is a portfolio / learning engagement performed against an
+> isolated lab account built with
+> [CloudGoat](https://github.com/RhinoSecurityLabs/cloudgoat)
+> (the `iam_privesc_by_rollback` scenario). It is not a real client engagement.
+> Account identifiers and source IPs are redacted throughout.
 
-## What this project is
+## Headline
 
-Deploy an intentionally vulnerable AWS environment (CloudGoat), audit it with
-Prowler and ScoutSuite, score and write up the findings like a consulting
-engagement, then build a Python script that parses CloudTrail logs to flag
-anomalous IAM activity.
+A low-privileged IAM user was able to escalate to **full account administrator
+in a single API call**, by rolling an IAM policy back to a dormant,
+admin-granting version left in its version history. Two automated configuration
+scanners (Prowler and ScoutSuite) did **not** flag this as high-severity,
+because they inspect only the *currently active* configuration and cannot see a
+dangerous version sitting dormant in a policy's history. A custom detection tool
+closes that gap by reading CloudTrail activity logs, catching the attack even
+after the configuration is reverted to look clean.
 
-## Scope
+Full write-up: **[`findings/assessment-report.md`](findings/assessment-report.md)**.
 
-1. **Environment** — Deploy CloudGoat on AWS Free Tier. Billing alarm set up
-   *before* touching resources. ✅ done
-2. **Audit** — Run Prowler and ScoutSuite against the environment. Review raw
-   findings.
-3. **Detection layer** — Python script parsing CloudTrail logs to flag
-   anomalous IAM activity (privilege escalation, unexpected role assumption,
-   etc.)
-4. **Deliverable** — GitHub repo with setup scripts/IaC, a client-style
-   findings report (severity + remediation), README.
+## The findings
 
-## How AI assistance is used here (disclosed, on purpose)
+| # | Finding | Severity |
+|---|---------|----------|
+| 1 | IAM policy version rollback privilege escalation | Critical |
+| 2 | CloudTrail activity logging not configured (remediated) | Critical |
+| 3 | Weak account password policy | Low |
 
-Claude accelerates the build (scaffolding, boilerplate, code). Joaquin drives
-all the security judgment — which findings matter, severity scoring,
-remediation calls, the "what would I tell a client" decisions — via a
-teach-then-test loop: Claude teaches a framework once, then hands over raw
-findings for Joaquin to score *before* Claude weighs in.
+## What's in this repo
 
-Bar for "this is honestly mine": able to reason through a novel, made-up
-misconfiguration scenario out loud in an interview, unprompted, using the
-framework — not just recite this project's specific findings.
+- **`findings/assessment-report.md`** — the client-style assessment report:
+  executive summary, scope & methodology, the three scored findings with
+  remediation, and the detection-engineering write-up. *Start here.*
+- **`detection/detect_policy_rollback.py`** — Python / boto3 tool that parses
+  CloudTrail history for the policy-rollback attack signature.
+- **`iac/cloudtrail-bucket-policy.json`** — the S3 bucket policy used to stand
+  up durable CloudTrail logging (one of the remediations). The account ID is a
+  `<ACCOUNT_ID>` placeholder — substitute your own to reuse it.
+- **`requirements.txt`** — Python dependencies for the detection tool.
 
-## Repo layout (fills in as we go)
+Raw Prowler/ScoutSuite scan output is intentionally **not** published, as it
+contains unsanitized account identifiers and resource detail; the report is the
+curated record of what the scans found.
 
+## Running the detection tool
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+python3 detection/detect_policy_rollback.py --profile <your-aws-profile>
 ```
-aws-cloud-security-project/
-├── README.md
-├── NOTES.md              # running log: what's done, decisions, blockers
-├── terraform/             # CloudGoat / IaC
-├── scripts/                # setup + detection scripts
-└── report/                 # findings report drafts
-```
+
+It reads CloudTrail for `SetDefaultPolicyVersion` activity and reports:
+
+- **HIGH** — a policy's default version changed two or more times within a
+  window (the escalate-then-revert round-trip), or a single change to a
+  full-admin version.
+- **NOTEWORTHY** — any other single version change (rare enough to be worth a
+  look).
+
+Run with `--help` for options (AWS profile, region, lookback window, revert
+window, and whether to inspect each version's granted permissions).
+
+## A note on AI assistance
+
+Code scaffolding and implementation were accelerated with AI assistance. The
+security judgment — which findings matter, how they are scored, the remediation
+recommendations, and the detection logic itself — is my own, developed by
+reasoning through each decision rather than accepting generated output at face
+value.
+
+## Tools used
+
+AWS CLI, Terraform, CloudGoat, Prowler, ScoutSuite, Python (boto3), AWS
+CloudTrail, IAM.

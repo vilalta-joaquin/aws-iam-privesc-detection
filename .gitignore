@@ -20,8 +20,9 @@ cloudgoat/whitelist.txt
 **/credentials
 **/access_key*
 
-# Audit tool raw output (may contain account IDs, ARNs, resource details —
-# review before deciding what's safe to publish in findings/)
+# Audit tool raw output — never published (contains account IDs, ARNs,
+# resource details). Curated results live in findings/assessment-report.md.
+output/
 **/prowler-output/
 **/scoutsuite-report/
 *.ndjson
